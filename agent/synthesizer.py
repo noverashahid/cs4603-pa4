@@ -8,9 +8,11 @@ serving contract — see spec Task 1.6).
 
 from __future__ import annotations
 
-from agent.state import AnalystState
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
 from agent.prompts import SYNTHESIZER_PROMPT
+from agent.state import AnalystState
+
 
 def make_synthesizer(llm):
     def synthesizer(state: AnalystState) -> dict:

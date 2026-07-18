@@ -9,11 +9,10 @@ TODO:
 
 from __future__ import annotations
 
-from agent.state import AnalystState
-
-
 from langchain_core.messages import HumanMessage, SystemMessage
+
 from agent.prompts import SUPERVISOR_PROMPT
+from agent.state import AnalystState
 
 RAG = "rag_agent"
 MCP = "mcp_tools"

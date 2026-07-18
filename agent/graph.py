@@ -11,6 +11,7 @@ TODO:
 """
 
 from __future__ import annotations
+
 import asyncio
 import os
 import sys
@@ -19,13 +20,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 
 from agent.planner import make_planner
+from agent.prompts import MCP_STEP_PROMPT
 from agent.rag_agent import make_rag_agent
 from agent.state import AnalystState
 from agent.supervisor import MCP, RAG, SYNTH, make_supervisor, route_from_supervisor
 from agent.synthesizer import make_synthesizer
-from langchain_mcp_adapters.client import MultiServerMCPClient
-
-from agent.prompts import MCP_STEP_PROMPT
 
 _DEFAULT_SERVER_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "tools", "mcp_server.py"

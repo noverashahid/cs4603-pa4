@@ -33,7 +33,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Lint with ruff
-        run: uv run ruff check agent/ client/
+        run: uvx run ruff check agent/ client/
 
       - name: Run offline smoke test
         run: uv run pytest -q tests/test_smoke.py
@@ -76,7 +76,7 @@ jobs:
           uv run python -c "
           from databricks.sdk import WorkspaceClient
           w = WorkspaceClient()
-          ep = w.serving_endpoints.get('pa4-document-analyst')
+          ep = w.serving_endpoints.get('cs4603-document-analyst')
           print(f'Endpoint: {ep.name}')
           print(f'Ready state: {ep.state.ready if ep.state else \"UNKNOWN\"}')
           served = ep.pending_config.served_entities[0] if ep.pending_config else ep.config.served_entities[0]
