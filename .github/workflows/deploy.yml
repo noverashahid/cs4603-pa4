@@ -36,6 +36,16 @@ jobs:
         run: uvx run ruff check agent/ client/
 
       - name: Run offline smoke test
+        env:
+          # Use dummy strings here so the offline test doesn't consume your real Databricks quota!
+          DATABRICKS_HOST: "https://dummy.cloud.databricks.com"
+          DATABRICKS_TOKEN: "dummy-token-for-ci"
+          DATABRICKS_MODEL: "databricks-meta-llama-3-3-70b-instruct"
+          EMBEDDINGS_ENDPOINT: "databricks-gte-large-en"
+          UC_CATALOG: "main"
+          UC_SCHEMA: "default"
+          VECTOR_SEARCH_ENDPOINT: "dummy-endpoint"
+          VECTOR_SEARCH_INDEX: "main.default.dummy_index"
         run: uv run pytest -q tests/test_smoke.py
 
   deploy:
@@ -61,13 +71,16 @@ jobs:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
           DATABRICKS_MODEL: ${{ secrets.DATABRICKS_MODEL }}
+          EMBEDDINGS_ENDPOINT: ${{ secrets.EMBEDDINGS_ENDPOINT }}
           UC_CATALOG: ${{ secrets.UC_CATALOG }}
           UC_SCHEMA: ${{ secrets.UC_SCHEMA }}
           VECTOR_SEARCH_ENDPOINT: ${{ secrets.VECTOR_SEARCH_ENDPOINT }}
           VECTOR_SEARCH_INDEX: ${{ secrets.VECTOR_SEARCH_INDEX }}
-          EMBEDDINGS_ENDPOINT: ${{ secrets.EMBEDDINGS_ENDPOINT }}
+          SERVING_ENDPOINT_NAME: ${{ secrets.SERVING_ENDPOINT_NAME }}
+          SECRET_SCOPE: ${{ secrets.SECRET_SCOPE }}
+          SOURCE_TABLE: ${{ secrets.SOURCE_TABLE }}
         run: uv run python deployment/deploy.py
-
+        
       - name: Print deployment status
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
