@@ -21,6 +21,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # TODO: install uv, sync deps, run `ruff check` and the smoke test
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
+      - name: Lint with ruff
+        run: uv run ruff check agent/ client/
+
+      - name: Run offline smoke test
+        run: uv run pytest -q tests/test_smoke.py
 
   deploy:
     needs: lint-and-test
@@ -29,3 +45,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # TODO: install deps and run `python deployment/deploy.py` with secrets
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
+      - name: Deploy model
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_MODEL: ${{ secrets.DATABRICKS_MODEL }}
+          UC_CATALOG: ${{ secrets.UC_CATALOG }}
+          UC_SCHEMA: ${{ secrets.UC_SCHEMA }}
+          VECTOR_SEARCH_ENDPOINT: ${{ secrets.VECTOR_SEARCH_ENDPOINT }}
+          VECTOR_SEARCH_INDEX: ${{ secrets.VECTOR_SEARCH_INDEX }}
+          EMBEDDINGS_ENDPOINT: ${{ secrets.EMBEDDINGS_ENDPOINT }}
+        run: uv run python deployment/deploy.py
+
+      - name: Print deployment status
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          uv run python -c "
+          from databricks.sdk import WorkspaceClient
+          w = WorkspaceClient()
+          ep = w.serving_endpoints.get('pa4-document-analyst')
+          print(f'Endpoint: {ep.name}')
+          print(f'Ready state: {ep.state.ready if ep.state else \"UNKNOWN\"}')
+          served = ep.pending_config.served_entities[0] if ep.pending_config else ep.config.served_entities[0]
+          print(f'Model version deployed: {served.entity_version}')
+          "
