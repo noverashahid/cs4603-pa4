@@ -33,7 +33,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Lint with ruff
-        run: uvx run ruff check agent/ client/
+        run: uvx ruff check agent/ client/
 
       - name: Run offline smoke test
         env:
@@ -80,7 +80,7 @@ jobs:
           SECRET_SCOPE: ${{ secrets.SECRET_SCOPE }}
           SOURCE_TABLE: ${{ secrets.SOURCE_TABLE }}
         run: uv run python deployment/deploy.py
-        
+
       - name: Print deployment status
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
