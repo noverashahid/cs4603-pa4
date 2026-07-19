@@ -89,6 +89,11 @@ def create_or_update_endpoint(uc_name: str, version: str) -> str:
     settings = get_settings()
     w = WorkspaceClient()
 
+    # Wait for any in-progress update to finish before submitting a new
+    # one — avoids ResourceConflict if a previous deploy (local or CI) is
+    # still mid-update when this run starts.
+    _wait_until_not_updating(w, ENDPOINT_NAME)
+
     served_entity = ServedEntityInput(
         entity_name=uc_name,
         entity_version=version,
@@ -109,26 +114,65 @@ def create_or_update_endpoint(uc_name: str, version: str) -> str:
     existing = [e.name for e in w.serving_endpoints.list()]
 
     if ENDPOINT_NAME not in existing:
-      print(f"Creating endpoint '{ENDPOINT_NAME}'...")
-      w.serving_endpoints.create(
-          name=ENDPOINT_NAME,
-          config=EndpointCoreConfigInput(
-              name=ENDPOINT_NAME,
-              served_entities=[served_entity],
-          ),
-      )
+        print(f"Creating endpoint '{ENDPOINT_NAME}'...")
+        w.serving_endpoints.create(
+            name=ENDPOINT_NAME,
+            config=EndpointCoreConfigInput(
+                name=ENDPOINT_NAME,
+                served_entities=[served_entity],
+            ),
+        )
     else:
         print(f"Updating endpoint '{ENDPOINT_NAME}' to version {version}...")
-        w.serving_endpoints.update_config(
-            name=ENDPOINT_NAME,
-            served_entities=[served_entity],
-        )
+        _update_with_retry(w, served_entity)
 
     _wait_for_ready(w, ENDPOINT_NAME)
 
     endpoint_url = f"{settings['host']}/serving-endpoints/{ENDPOINT_NAME}/invocations"
     print(f"Endpoint URL: {endpoint_url}")
     return endpoint_url
+
+
+def _wait_until_not_updating(w: WorkspaceClient, endpoint_name: str,
+                              timeout_s: int = 600, poll_s: int = 15) -> None:
+    """Block until the endpoint isn't mid-update, so the next config
+    change (create or update_config) won't hit ResourceConflict.
+    """
+    start = time.time()
+    while time.time() - start < timeout_s:
+        try:
+            ep = w.serving_endpoints.get(endpoint_name)
+        except Exception:
+            return  # endpoint doesn't exist yet — nothing to wait for
+        update_state = ep.state.config_update if ep.state else None
+        if update_state is None or str(update_state).endswith("NOT_UPDATING"):
+            return
+        print(f"  Endpoint busy (config_update={update_state}), waiting...")
+        time.sleep(poll_s)
+    raise TimeoutError(f"Endpoint '{endpoint_name}' still updating after {timeout_s}s.")
+
+
+def _update_with_retry(w: WorkspaceClient, served_entity, max_attempts: int = 5,
+                        base_delay_s: int = 20) -> None:
+    """Retry update_config on ResourceConflict with linear backoff, in
+    case a concurrent update slips in between our wait check above and
+    this call.
+    """
+    from databricks.sdk.errors.platform import ResourceConflict
+
+    for attempt in range(max_attempts):
+        try:
+            w.serving_endpoints.update_config(
+                name=ENDPOINT_NAME,
+                served_entities=[served_entity],
+            )
+            return
+        except ResourceConflict:
+            if attempt == max_attempts - 1:
+                raise
+            delay = base_delay_s * (attempt + 1)
+            print(f"  Endpoint busy, retrying in {delay}s (attempt {attempt + 1}/{max_attempts})...")
+            time.sleep(delay)
 
 
 def _wait_for_ready(w: WorkspaceClient, endpoint_name: str,
