@@ -85,11 +85,14 @@ jobs:
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          SERVING_ENDPOINT_NAME: ${{ secrets.SERVING_ENDPOINT_NAME }}
         run: |
           uv run python -c "
+          import os
           from databricks.sdk import WorkspaceClient
           w = WorkspaceClient()
-          ep = w.serving_endpoints.get('cs4603-document-analyst')
+          name = os.environ.get('SERVING_ENDPOINT_NAME', 'pa4-document-analyst')
+          ep = w.serving_endpoints.get(name)
           print(f'Endpoint: {ep.name}')
           print(f'Ready state: {ep.state.ready if ep.state else \"UNKNOWN\"}')
           served = ep.pending_config.served_entities[0] if ep.pending_config else ep.config.served_entities[0]
