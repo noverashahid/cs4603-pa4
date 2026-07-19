@@ -62,6 +62,7 @@ INPUT_EXAMPLE = {"messages": [{"role": "user", "content": "What was the revenue?
 def log_and_register():
     settings = get_settings()
 
+    mlflow.set_tracking_uri("databricks")
     mlflow.set_registry_uri("databricks-uc")
     mlflow.set_experiment(f"/Shared/{MODEL_NAME}_experiment")
 
