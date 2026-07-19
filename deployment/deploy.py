@@ -18,6 +18,8 @@ from __future__ import annotations
 import os
 
 import mlflow
+from mlflow.models.signature import ModelSignature
+from mlflow.types.llm import CHAT_MODEL_INPUT_SCHEMA, CHAT_MODEL_OUTPUT_SCHEMA
 
 from config import get_settings
 
@@ -59,20 +61,28 @@ CODE_PATHS = [
 INPUT_EXAMPLE = {"messages": [{"role": "user", "content": "What was the revenue?"}]}
 
 
-def log_and_register():
+def log_and_register_for_agents():
     settings = get_settings()
 
     mlflow.set_tracking_uri("databricks")
     mlflow.set_registry_uri("databricks-uc")
-    mlflow.set_experiment(f"/Shared/{MODEL_NAME}_experiment")
+    mlflow.set_experiment(f"/Shared/{MODEL_NAME}_agents_experiment")
+
+    # The required Chat Signature for Databricks Agent Framework
+    agent_signature = ModelSignature(
+        inputs=CHAT_MODEL_INPUT_SCHEMA,
+        outputs=CHAT_MODEL_OUTPUT_SCHEMA,
+    )
 
     with mlflow.start_run():
+        # Use mlflow.langchain.log_model and point to your EXISTING agent_model.py!
         model_info = mlflow.langchain.log_model(
-            lc_model=AGENT_MODEL_PATH,
+            lc_model="deployment/agent_model.py",
             name="agent",
             code_paths=CODE_PATHS,
             pip_requirements=PIP_REQUIREMENTS,
             input_example=INPUT_EXAMPLE,
+            signature=agent_signature,
         )
 
     catalog = os.environ["UC_CATALOG"]
@@ -83,7 +93,6 @@ def log_and_register():
     print(f"Registered model: {uc_name}, version {registered.version}")
 
     return uc_name, registered.version
-
 
 def create_or_update_endpoint(uc_name: str, version: str) -> str:
     settings = get_settings()

@@ -27,10 +27,17 @@ def _require(name: str) -> str:
 
 
 def get_settings() -> dict[str, str]:
-    """Return all configuration values, validating the required ones."""
+    """Return all configuration values, validating the required ones.
+
+    DATABRICKS_HOST/DATABRICKS_TOKEN are read only for local dev
+    convenience (e.g. the deploy scripts' own MLflow/SDK calls) — they are
+    NOT required here and must never be required by get_chat_llm(), since
+    the agents.deploy() endpoint (Bonus B) authenticates automatically via
+    declared `resources=` and never has a PAT in its environment.
+    """
     return {
-        "host": _require("DATABRICKS_HOST").rstrip("/"),
-        "token": _require("DATABRICKS_TOKEN"),
+        "host": os.environ.get("DATABRICKS_HOST", "").rstrip("/"),
+        "token": os.environ.get("DATABRICKS_TOKEN", ""),
         "model": _require("DATABRICKS_MODEL"),
         "embeddings": os.environ.get("EMBEDDINGS_ENDPOINT", "databricks-gte-large-en"),
         "vs_endpoint": os.environ.get("VECTOR_SEARCH_ENDPOINT", ""),
@@ -40,17 +47,17 @@ def get_settings() -> dict[str, str]:
 
 @lru_cache(maxsize=1)
 def get_chat_llm(temperature: float = 0.0):
-    """Configured ChatOpenAI client pointed at Databricks Model Serving.
+    """Configured ChatDatabricks client pointed at Databricks Model Serving.
 
-    We use the OpenAI-compatible surface (same as PA1–PA3) so the deployed
-    endpoint speaks the same protocol the client SDK expects.
+    Uses databricks_langchain's auto-auth-aware client instead of
+    langchain_openai.ChatOpenAI + an explicit PAT: it resolves credentials
+    via the Databricks SDK's default auth chain, which picks up an
+    explicit DATABRICKS_HOST/TOKEN when present (local dev, Part 2's
+    manually-created endpoint) and otherwise falls back to the
+    auto-provisioned OBO credential that agents.deploy() injects for a
+    declared DatabricksServingEndpoint resource (Bonus B) — no PAT needed.
     """
-    from langchain_openai import ChatOpenAI
+    from databricks_langchain import ChatDatabricks
 
     s = get_settings()
-    return ChatOpenAI(
-        model=s["model"],
-        api_key=s["token"],
-        base_url=f"{s['host']}/serving-endpoints",
-        temperature=temperature,
-    )
+    return ChatDatabricks(endpoint=s["model"], temperature=temperature)
